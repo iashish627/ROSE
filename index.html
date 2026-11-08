@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Portrait Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let particles = [];
+        const ANIMATION_SPEED = 0.05;
+        const PARTICLE_SIZE = 1.1;
+        const LAVENDER = { r: 230, g: 182, b: 255 };
+        
+        // Resize canvas to fullscreen
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            console.log('Canvas resized to:', width, 'x', height);
+        }
+        
+        window.addEventListener('resize', resize);
+        resize();
+        
+        // Simple test particle
+        class Particle {
+            constructor(targetX, targetY, brightness) {
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.brightness = brightness;
+                
+                // Random starting position
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                
+                // Fixed alpha for visibility
+                this.alpha = 1.0;
+            }
+            
+            update() {
+                this.x += (this.targetX - this.x) * ANIMATION_SPEED;
+                this.y += (this.targetY - this.y) * ANIMATION_SPEED;
+            }
+            
+            draw() {
+                ctx.fillStyle = `rgba(${LAVENDER.r}, ${LAVENDER.g}, ${LAVENDER.b}, ${this.alpha})`;
+                ctx.fillRect(this.x, this.y, PARTICLE_SIZE, PARTICLE_SIZE);
+            }
+        }
+        
+        // Load image and create particles
+        function createParticles() {
+            console.log('Starting to load image...');
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = 'portrait.jpg';
+            
+            img.onload = function() {
+                console.log('Image loaded successfully');
+                console.log('Image dimensions:', img.width, 'x', img.height);
+                
+                // Calculate scale to fit 90-92% of screen
+                const scaleX = (width * 0.91) / img.width;
+                const scaleY = (height * 0.91) / img.height;
+                const scale = Math.min(scaleX, scaleY);
+                
+                const scaledWidth = Math.floor(img.width * scale);
+                const scaledHeight = Math.floor(img.height * scale);
+                const offsetX = Math.floor((width - scaledWidth) / 2);
+                const offsetY = Math.floor((height - scaledHeight) / 2);
+                
+                console.log('Scale:', scale);
+                console.log('Scaled dimensions:', scaledWidth, 'x', scaledHeight);
+                
+                // Draw image to offscreen canvas
+                const offscreenCanvas = document.createElement('canvas');
+                offscreenCanvas.width = scaledWidth;
+                offscreenCanvas.height = scaledHeight;
+                const offscreenCtx = offscreenCanvas.getContext('2d');
+                offscreenCtx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+                
+                const imageData = offscreenCtx.getImageData(0, 0, scaledWidth, scaledHeight);
+                const data = imageData.data;
+                
+                particles = [];
+                
+                // Create particles from image
+                for (let y = 0; y < scaledHeight; y++) {
+                    for (let x = 0; x < scaledWidth; x++) {
+                        const i = (y * scaledWidth + x) * 4;
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        
+                        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                        
+                        if (brightness < 0.1) continue;
+                        
+                        // Every 3rd pixel for performance
+                        if (x % 3 === 0 && y % 3 === 0) {
+                            const targetX = offsetX + x;
+                            const targetY = offsetY + y;
+                            particles.push(new Particle(targetX, targetY, brightness));
+                        }
+                    }
+                }
+                
+                console.log('Created', particles.length, 'particles');
+                
+                // Start animation
+                animate();
+            };
+            
+            img.onerror = function() {
+                console.error('Failed to load portrait.jpg');
+            };
+        }
+        
+        // Animation loop
+        function animate() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Initialize
+        createParticles();
+    </script>
+</body>
+</html>
